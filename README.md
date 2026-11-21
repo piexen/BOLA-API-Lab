@@ -8,7 +8,7 @@ Recovered learning materials from the course. The local source matches the suppl
 - PayFlow payment API
 - CloudVault multi-tenant API
 
-The application uses Node.js, Express, HTML templates, browser JavaScript and CSS. The API specification files in `DOCS/` can be inspected in an OpenAPI viewer. Original course text is retained in its original language.
+The application uses Node.js, Express, HTML templates, browser JavaScript and CSS. The API specification files in `DOCS/` can be inspected in an OpenAPI viewer. Original course text is retained in its original language. Swagger pages load pinned assets from `unpkg.com` and therefore need internet access for that interface.
 
 ## Run locally
 
