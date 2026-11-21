@@ -1,0 +1,93 @@
+{
+  "kind": "Recovered course-provided learning materials",
+  "archiveName": "BOLA.zip",
+  "studentAuthorshipEstablished": false,
+  "credentialLiteralReplacements": 21,
+  "files": [
+    {
+      "file": ".gitignore",
+      "originalSha256": "589bdb7e54af08013bd8de9810b0cea147409a56c68eae72fcf08ce36ec11062",
+      "changedForPublication": true
+    },
+    {
+      "file": "DOCS/bola-openapi.yaml",
+      "originalSha256": "b34b2634b8e8f1aca43bde0a506769018f695efeefcd737320a07ef16b964c87",
+      "changedForPublication": true
+    },
+    {
+      "file": "DOCS/bola1.txt",
+      "originalSha256": "a8b5075ad4e197214ce48414524c3ba494e159668ce1aed06351825b4b2bb263",
+      "changedForPublication": true
+    },
+    {
+      "file": "DOCS/bola2-openapi.yaml",
+      "originalSha256": "50e7988d0902997c8101a59687cc07421fe05656816b3ed11fe1eed9e02b97a1",
+      "changedForPublication": true
+    },
+    {
+      "file": "DOCS/bola2.txt",
+      "originalSha256": "6a068091e3e118c839586d870e82242e0024d457e2c7741788dbe5830ce0dd5e",
+      "changedForPublication": true
+    },
+    {
+      "file": "DOCS/bola3-openapi.yaml",
+      "originalSha256": "b16c13e8ae9095c2dfb13c803133bdfa276695a1f62ca27e43c4e5191023a4cb",
+      "changedForPublication": true
+    },
+    {
+      "file": "DOCS/bola3.txt",
+      "originalSha256": "4229c3bf40a6a4259290d4011c6f460b9f23be3dca5a3e614211ce4d0ee4e700",
+      "changedForPublication": true
+    },
+    {
+      "file": "bola-lab.js",
+      "originalSha256": "b34b7034a7056af252f51442266e1b1c691d45afdc17c16f1d418e625987ee5d",
+      "changedForPublication": true
+    },
+    {
+      "file": "bola2-lab.js",
+      "originalSha256": "dc04a4f1f021a740b48c068b34b6fe48ac4940925147df448c63d145fa365b14",
+      "changedForPublication": true
+    },
+    {
+      "file": "bola3-lab.js",
+      "originalSha256": "37a49e71465a2d927589be6fadc5a8e42f6253c2736743804206f9d7caaead24",
+      "changedForPublication": true
+    },
+    {
+      "file": "lab-config.js",
+      "originalSha256": "3d26b62d3b10eeda7742b7fa9bbcfab55dc1d9d05a84a9a0a0f77516bf3cf90e",
+      "changedForPublication": false
+    },
+    {
+      "file": "package-lock.json",
+      "originalSha256": "ee237e82fb9987e14d097a6b9ca0ad0020804989ec00c7134c31571ac6d1359e",
+      "changedForPublication": false
+    },
+    {
+      "file": "package.json",
+      "originalSha256": "18397657cb1da8eab1ef7403d3ca22074aae9aa510a23f4d14170602714a2cb3",
+      "changedForPublication": true
+    },
+    {
+      "file": "public/bola.css",
+      "originalSha256": "96bcd43e894bb1c3af0b01a1eb99301c1ed85aa8ea58ed6aaebfa5846920174f",
+      "changedForPublication": false
+    },
+    {
+      "file": "public/style.css",
+      "originalSha256": "b8240241c6d170649581ceb22baf4203ca329e1fb8964866e586acd663577426",
+      "changedForPublication": false
+    },
+    {
+      "file": "reference/README.course.md",
+      "originalSha256": "cc979e621566c3f9f5ed4180935c0ad67b3ab17c0848fd2d3e1368cec3805aa7",
+      "changedForPublication": false
+    },
+    {
+      "file": "server.js",
+      "originalSha256": "d0dfbee507abe094c778510463d35ad67ce79e7dc151eca6b11b53fdc17d8d9a",
+      "changedForPublication": true
+    }
+  ]
+}

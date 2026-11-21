@@ -1,0 +1,579 @@
+openapi: 3.0.3
+info:
+  title: PayFlow API
+  description: |
+    Учебный REST API лаборатории BOLA 2 (Broken Object Level Authorization / IDOR).
+    Финтех-сценарии: кошельки, переводы, карты, инвойсы, аудит.
+
+    **Вход:** `POST /auth/login` с паролем лаборатории и username тестового пользователя.
+    Дальше — заголовок `Authorization: Bearer <accessToken>`.
+  version: 1.0.0
+  contact:
+    name: BOLA Lab 2 — PayFlow
+
+servers:
+  - url: http://localhost:3847/bola2/api/v1
+    description: Локальный сервер BOLA Lab
+
+tags:
+  - name: auth
+    description: Аутентификация
+  - name: me
+    description: Данные текущего пользователя
+  - name: wallets
+    description: Кошельки
+  - name: transactions
+    description: Транзакции и переводы
+  - name: cards
+    description: Платёжные карты
+  - name: invoices
+    description: Счета
+  - name: users
+    description: Пользователи и экспорт
+  - name: audit
+    description: Аудит-логи
+
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Вход — получить accessToken
+      description: Пароль лаборатории один для всех. Username — тестовый пользователь (alice, bob, …).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              username: alice
+              password: portfolio-demo-only
+      responses:
+        "200":
+          description: Успешный вход
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Неверный логин или пароль
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /:
+    get:
+      tags: [me]
+      summary: Информация об API и список заданий
+      responses:
+        "200":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /me/profile:
+    get:
+      tags: [me]
+      summary: Профиль текущего пользователя
+      description: Параметр `userId` в query подменяет объект — BOLA.
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: integer
+          example: 2
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /me/wallets:
+    get:
+      tags: [me]
+      summary: Кошельки текущего пользователя
+      description: Фильтрует по ownerId — «безопасный» список.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wallets:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Wallet"
+                  count:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /wallets/{walletId}:
+    get:
+      tags: [wallets]
+      summary: Кошелёк по числовому id
+      description: Не проверяет владельца — BOLA.
+      parameters:
+        - $ref: "#/components/parameters/walletId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /wallets/by-ref/{ref}:
+    get:
+      tags: [wallets]
+      summary: Кошелёк по ref
+      parameters:
+        - name: ref
+          in: path
+          required: true
+          schema:
+            type: string
+          example: WLT-bob8f2a1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /wallets/{walletId}/transactions:
+    get:
+      tags: [wallets]
+      summary: Транзакции кошелька
+      parameters:
+        - $ref: "#/components/parameters/walletId"
+      responses:
+        "200":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /transactions/{transactionId}:
+    get:
+      tags: [transactions]
+      summary: Транзакция по id
+      description: Возвращает internalNote без проверки участия пользователя.
+      parameters:
+        - $ref: "#/components/parameters/transactionId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /transactions/search:
+    post:
+      tags: [transactions]
+      summary: Поиск транзакций
+      description: userId / walletId / minAmount в теле — без проверки прав.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionSearch"
+            example:
+              userId: 2
+      responses:
+        "200":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /transfers:
+    post:
+      tags: [transactions]
+      summary: Перевод между кошельками
+      description: fromWalletId не проверяется на владельца — write BOLA.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferRequest"
+            example:
+              fromWalletId: 502
+              toWalletId: 501
+              amount: 50
+              memo: BOLA test
+      responses:
+        "201":
+          description: Перевод создан
+        "400":
+          description: Неверные параметры или недостаточно средств
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /cards/{cardId}:
+    get:
+      tags: [cards]
+      summary: Карта по id (PAN, CVV)
+      parameters:
+        - $ref: "#/components/parameters/cardId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [cards]
+      summary: Удалить карту
+      parameters:
+        - $ref: "#/components/parameters/cardId"
+      responses:
+        "200":
+          description: Удалено
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /invoices:
+    get:
+      tags: [invoices]
+      summary: Инвойсы текущего пользователя
+      responses:
+        "200":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /invoices/{invoiceId}:
+    get:
+      tags: [invoices]
+      summary: Инвойс по id
+      description: Список /invoices фильтрует, отдельный GET — нет.
+      parameters:
+        - $ref: "#/components/parameters/invoiceId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /invoices/{invoiceId}/status:
+    patch:
+      tags: [invoices]
+      summary: Изменить статус инвойса
+      parameters:
+        - $ref: "#/components/parameters/invoiceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [pending, paid, cancelled]
+            example:
+              status: cancelled
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Неверный status
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /users/{userId}/export:
+    get:
+      tags: [users]
+      summary: Полный экспорт данных пользователя
+      parameters:
+        - $ref: "#/components/parameters/userId"
+      responses:
+        "200":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /audit/logs:
+    get:
+      tags: [audit]
+      summary: Список аудит-логов
+      description: Только auditor/admin. Отдельные записи по id могут быть доступны иначе.
+      responses:
+        "200":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Forbidden для customer/merchant
+
+  /audit/logs/{logId}:
+    get:
+      tags: [audit]
+      summary: Аудит-запись по id
+      parameters:
+        - $ref: "#/components/parameters/logId"
+      responses:
+        "200":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: accessToken
+      description: Токен из POST /auth/login
+
+  parameters:
+    walletId:
+      name: walletId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 502
+    transactionId:
+      name: transactionId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 9002
+    cardId:
+      name: cardId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 702
+    invoiceId:
+      name: invoiceId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 603
+    userId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 2
+    logId:
+      name: logId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 3
+
+  responses:
+    Unauthorized:
+      description: Нет или неверный Bearer token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Объект не найден
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: alice
+        password:
+          type: string
+          example: portfolio-demo-only
+
+    LoginResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          example: 7200
+        user:
+          $ref: "#/components/schemas/User"
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        role:
+          type: string
+          enum: [customer, merchant, auditor, admin]
+        email:
+          type: string
+        kycLevel:
+          type: string
+
+    Wallet:
+      type: object
+      properties:
+        id:
+          type: integer
+        ref:
+          type: string
+        ownerId:
+          type: integer
+        currency:
+          type: string
+        balance:
+          type: number
+        label:
+          type: string
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        fromWalletId:
+          type: integer
+        toWalletId:
+          type: integer
+        amount:
+          type: number
+        description:
+          type: string
+        internalNote:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    TransactionSearch:
+      type: object
+      properties:
+        userId:
+          type: integer
+        walletId:
+          type: integer
+        minAmount:
+          type: number
+
+    TransferRequest:
+      type: object
+      required: [fromWalletId, toWalletId, amount]
+      properties:
+        fromWalletId:
+          type: integer
+        toWalletId:
+          type: integer
+        amount:
+          type: number
+        memo:
+          type: string
+
+    Card:
+      type: object
+      properties:
+        id:
+          type: integer
+        walletId:
+          type: integer
+        brand:
+          type: string
+        last4:
+          type: string
+        pan:
+          type: string
+        exp:
+          type: string
+        cvv:
+          type: string
+
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: integer
+        ownerId:
+          type: integer
+        amount:
+          type: number
+        status:
+          type: string
+          enum: [pending, paid, cancelled]
+        items:
+          type: array
+          items:
+            type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        hint:
+          type: string
+
+security:
+  - bearerAuth: []

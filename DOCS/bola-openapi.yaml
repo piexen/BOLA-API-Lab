@@ -1,0 +1,457 @@
+openapi: 3.0.3
+info:
+  title: MediNotes API
+  description: |
+    Учебный REST API лаборатории BOLA (Broken Object Level Authorization / IDOR).
+    Аутентификация есть; проверка прав на объект часто отсутствует — намеренно.
+
+    **Вход в API:** `POST /auth/login` с паролем лаборатории и username тестового пользователя.
+    Дальше — заголовок `Authorization: Bearer <accessToken>`.
+  version: 1.0.0
+  contact:
+    name: BOLA Lab 1 — MediNotes
+
+servers:
+  - url: http://localhost:3847/bola/api/v1
+    description: Локальный сервер BOLA Lab
+
+tags:
+  - name: auth
+    description: Аутентификация
+  - name: users
+    description: Профиль
+  - name: notes
+    description: Медицинские записи (основная BOLA-поверхность)
+  - name: patients
+    description: Данные пациентов
+  - name: appointments
+    description: Приёмы
+  - name: prescriptions
+    description: Рецепты
+
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Вход — получить accessToken
+      description: Пароль лаборатории один для всех (`portfolio-demo-only`). Username — тестовый пользователь.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              username: patient.kozlov
+              password: portfolio-demo-only
+      responses:
+        "200":
+          description: Успешный вход
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Неверный логин или пароль
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /:
+    get:
+      tags: [users]
+      summary: Информация об API и список эндпоинтов
+      responses:
+        "200":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /users/me:
+    get:
+      tags: [users]
+      summary: Профиль текущего пользователя
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /notes:
+    get:
+      tags: [notes]
+      summary: Список записей текущего пользователя (фильтр по роли)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Note"
+                  count:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [notes]
+      summary: Создать запись
+      description: BOLA — можно указать чужой patientId.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NoteCreate"
+      responses:
+        "201":
+          description: Создано
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+        "400":
+          description: Ошибка валидации
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /notes/{noteId}:
+    parameters:
+      - $ref: "#/components/parameters/noteId"
+    get:
+      tags: [notes]
+      summary: Запись по id
+      description: BOLA — любая запись по id без проверки владельца.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      tags: [notes]
+      summary: Обновить запись
+      description: BOLA — можно изменить чужую запись.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NoteUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      tags: [notes]
+      summary: Удалить запись
+      description: BOLA — можно удалить чужую запись.
+      responses:
+        "200":
+          description: Удалено
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /patients:
+    get:
+      tags: [patients]
+      summary: Список всех пациентов
+      description: |
+        BOLA — любой авторизованный пользователь видит всех пациентов клиники.
+        Пациент не должен видеть других пациентов; врач — возможно только своих.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  patients:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+                  count:
+                    type: integer
+              example:
+                patients:
+                  - id: 3
+                    username: patient.kozlov
+                    role: patient
+                    name: "Козлов И.В."
+                  - id: 4
+                    username: patient.sidorov
+                    role: patient
+                    name: "Сидоров П.А."
+                count: 2
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /patients/{patientId}/notes:
+    parameters:
+      - $ref: "#/components/parameters/patientId"
+    get:
+      tags: [patients]
+      summary: Все записи пациента
+      description: BOLA — записи любого patientId.
+      responses:
+        "200":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /patients/{patientId}/export:
+    parameters:
+      - $ref: "#/components/parameters/patientId"
+    get:
+      tags: [patients]
+      summary: Экспорт досье пациента
+      description: BOLA — полное досье любого пациента (notes, appointments, prescriptions).
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Пациент не найден
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /appointments/{appointmentId}:
+    parameters:
+      - $ref: "#/components/parameters/appointmentId"
+    get:
+      tags: [appointments]
+      summary: Приём по id
+      description: BOLA — любой приём по id.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /prescriptions/{prescriptionId}:
+    parameters:
+      - $ref: "#/components/parameters/prescriptionId"
+    get:
+      tags: [prescriptions]
+      summary: Рецепт по id
+      description: BOLA — любой рецепт по id.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prescription"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: accessToken
+      description: Токен из POST /auth/login или статический токен тестового пользователя
+
+  parameters:
+    noteId:
+      name: noteId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 104
+    patientId:
+      name: patientId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 4
+    appointmentId:
+      name: appointmentId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 202
+    prescriptionId:
+      name: prescriptionId
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 302
+
+  responses:
+    Unauthorized:
+      description: Нет или неверный Bearer token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Объект не найден
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: patient.kozlov
+        password:
+          type: string
+          example: portfolio-demo-only
+
+    LoginResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          example: 7200
+        user:
+          $ref: "#/components/schemas/User"
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        role:
+          type: string
+          enum: [doctor, patient, admin]
+        name:
+          type: string
+
+    Note:
+      type: object
+      properties:
+        id:
+          type: integer
+        patientId:
+          type: integer
+        doctorId:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        confidential:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    NoteCreate:
+      type: object
+      required: [title, content]
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        patientId:
+          type: integer
+          description: BOLA — можно указать чужой id
+        doctorId:
+          type: integer
+        confidential:
+          type: boolean
+          default: true
+
+    NoteUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        confidential:
+          type: boolean
+
+    Appointment:
+      type: object
+      properties:
+        id:
+          type: integer
+        patientId:
+          type: integer
+        doctorId:
+          type: integer
+        date:
+          type: string
+        reason:
+          type: string
+        room:
+          type: string
+
+    Prescription:
+      type: object
+      properties:
+        id:
+          type: integer
+        patientId:
+          type: integer
+        doctorId:
+          type: integer
+        medication:
+          type: string
+        dosage:
+          type: string
+        issuedAt:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        hint:
+          type: string
+
+security:
+  - bearerAuth: []

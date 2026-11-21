@@ -1,0 +1,274 @@
+openapi: 3.0.3
+info:
+  title: CloudVault API
+  description: |
+    BOLA Lab 3 — multi-tenant document SaaS (advanced IDOR).
+    Login: POST /auth/login (password lab + username).
+    Bearer on protected routes. Public: GET /shares/{shareCode}.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3847/bola3/api/v1
+
+tags:
+  - name: auth
+  - name: me
+  - name: documents
+  - name: organizations
+  - name: workspaces
+  - name: shares
+  - name: users
+  - name: support
+  - name: api-keys
+  - name: audit
+
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Login — accessToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, example: sarah }
+                password: { type: string, example: portfolio-demo-only }
+      responses:
+        "200": { description: OK }
+
+  /shares/{shareCode}:
+    get:
+      tags: [shares]
+      summary: Public share preview (no auth)
+      description: BOLA — leaks docUuid for further GET /documents/{uuid}
+      security: []
+      parameters:
+        - name: shareCode
+          in: path
+          required: true
+          schema: { type: string }
+          example: preview-acme-mna-7k2
+      responses:
+        "200": { description: Preview + docUuid }
+
+  /:
+    get:
+      tags: [me]
+      summary: API info
+      responses:
+        "200": { description: OK }
+
+  /me:
+    get:
+      tags: [me]
+      summary: Current user profile
+      responses:
+        "200": { description: OK }
+
+  /me/documents:
+    get:
+      tags: [me]
+      summary: Own documents only (filtered)
+      responses:
+        "200": { description: OK }
+
+  /me/summary:
+    get:
+      tags: [me]
+      summary: Org document stats
+      description: BOLA — header X-Organization-Id switches tenant
+      parameters:
+        - name: X-Organization-Id
+          in: header
+          schema: { type: integer }
+          example: 2
+      responses:
+        "200": { description: OK }
+
+  /organizations/{orgId}/documents:
+    get:
+      tags: [organizations]
+      summary: All documents in tenant
+      description: BOLA — cross-tenant if orgId != user org
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /documents/{docUuid}:
+    get:
+      tags: [documents]
+      summary: Document by UUID
+      description: BOLA — no owner/org check
+      parameters:
+        - name: docUuid
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: OK }
+    put:
+      tags: [documents]
+      summary: Update document
+      description: BOLA write — any uuid
+      parameters:
+        - name: docUuid
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                body: { type: string }
+                classification: { type: string }
+      responses:
+        "200": { description: OK }
+
+  /documents/{docUuid}/transfer:
+    post:
+      tags: [documents]
+      summary: Transfer ownership
+      description: BOLA — newOwnerId without check
+      parameters:
+        - name: docUuid
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newOwnerId: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /documents/query:
+    post:
+      tags: [documents]
+      summary: Search documents
+      description: BOLA — filter by orgId, ownerId, classification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                orgId: { type: integer }
+                ownerId: { type: integer }
+                classification: { type: string }
+                workspaceId: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /documents/batch-fetch:
+    post:
+      tags: [documents]
+      summary: Batch fetch by UUID list
+      description: BOLA — no ownership validation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                uuids:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200": { description: OK }
+
+  /workspaces/{workspaceId}/roster:
+    get:
+      tags: [workspaces]
+      summary: Workspace members
+      description: BOLA — any workspace id
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema: { type: integer }
+          example: 802
+      responses:
+        "200": { description: OK }
+
+  /users/{userId}/vault-export:
+    get:
+      tags: [users]
+      summary: Full user vault export
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /support/session:
+    get:
+      tags: [support]
+      summary: Support impersonation view
+      description: BOLA — X-Impersonate-User header
+      parameters:
+        - name: X-Impersonate-User
+          in: header
+          required: true
+          schema: { type: integer }
+          example: 2
+      responses:
+        "200": { description: OK }
+
+  /api-keys/{keyId}:
+    get:
+      tags: [api-keys]
+      summary: API key with secret
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /audit/events:
+    get:
+      tags: [audit]
+      summary: Audit list (admin only)
+      responses:
+        "403": { description: Forbidden for members }
+
+  /audit/events/{eventId}:
+    get:
+      tags: [audit]
+      summary: Single audit event
+      description: BOLA — open while list is closed
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: integer }
+          example: 502
+      responses:
+        "200": { description: OK }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+security:
+  - bearerAuth: []

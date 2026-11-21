@@ -1,0 +1,85 @@
+.bola-card {
+  background: #fff;
+  border: 1px solid #e4e4e7;
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.bola-card h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.bola-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.bola-table th,
+.bola-table td {
+  border: 1px solid #e4e4e7;
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+}
+
+.bola-table th {
+  background: #f4f4f5;
+}
+
+.bola-pre {
+  background: #18181b;
+  color: #e4e4e7;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.bola-list {
+  padding-left: 1.25rem;
+}
+
+.bola-list li {
+  margin-bottom: 0.35rem;
+}
+
+.badge--danger {
+  display: inline-block;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.03em;
+}
+
+.bola-swagger-body {
+  margin: 0;
+  max-width: none;
+  padding: 0;
+  background: #fafafa;
+}
+
+.bola-swagger-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.65rem 1.25rem;
+  background: #18181b;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.bola-swagger-bar a {
+  color: #a5f3fc;
+}
+
+.bola-swagger-bar span {
+  flex: 1;
+  font-weight: 600;
+}

